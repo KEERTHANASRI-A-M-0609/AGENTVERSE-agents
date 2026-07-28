@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ShopMind AI — Demand Prediction Agent
 
 Retail demand forecasting for small shops: ML forecasts, reorder recommendations, and optional Gemini explanations — without burning API quota on every dashboard refresh.
@@ -69,3 +70,6 @@ Auto-refresh runs every **5 minutes** and never calls Gemini.
 | GET | `/api/v1/health` | DB, model store, Gemini flag, last prediction |
 
 Demo shop ID after dataset load: `shop_001`.
+=======
+# AGENTVERSE-agents
+>>>>>>> 28962d34bc33b86a63dd6cc021b453c29189d187

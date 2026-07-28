@@ -13387,3 +13387,41 @@ sqlalchemy.exc.TimeoutError: QueuePool limit of size 5 overflow 10 reached, conn
 2026-07-28 19:05:35 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.CRITICAL: Reorder School Backpack Blue immediately
 2026-07-28 19:05:59 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.HIGH: Demand spike on Plastic Water Bottle 1L — pre-empt stockout
 2026-07-28 19:06:23 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.MEDIUM: Forecast update: Plastic Water Bottle 1L demand rising
+2026-07-28 19:06:39 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.CRITICAL: Reorder Ponni Rice 5kg immediately
+2026-07-28 19:06:55 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Free ₹14,400 locked in Plastic Water Bottle 1L
+2026-07-28 19:07:03 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.CRITICAL: Reorder School Backpack Blue immediately
+2026-07-28 19:07:11 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.LOW: Order logged: Gel Ball Pen Blue
+2026-07-28 19:07:27 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.CRITICAL: Reorder Redmi Note 13 (8GB RAM) immediately
+2026-07-28 19:07:50 | INFO     | shopmind | GEMINI_ENABLED=false. Explanations use local templates.
+2026-07-28 19:07:55 | INFO     | shopmind | Analytics as_of fallback to latest sale_date=2026-07-27 for shop=shop_001
+2026-07-28 19:07:55 | INFO     | shopmind | Business health shop=shop_001 score=87.1 growth=100.0 consistency=57.6 movement=99.5
+2026-07-28 19:07:55 | INFO     | shopmind | Analytics as_of fallback to latest sale_date=2026-07-27 for shop=shop_001
+2026-07-28 19:07:55 | INFO     | shopmind | Analytics as_of fallback to latest sale_date=2026-07-27 for shop=shop_001
+2026-07-28 19:07:55 | INFO     | shopmind | Analytics dashboard shop=shop_001 as_of=2026-07-27 revenue=62884.00 growth=98.30%
+2026-07-28 19:07:55 | INFO     | shopmind | Analytics as_of fallback to latest sale_date=2026-07-27 for shop=shop_001
+2026-07-28 19:07:55 | INFO     | shopmind | POST /analytics/insights shop_id=shop_001
+2026-07-28 19:07:55 | INFO     | shopmind | Analytics as_of fallback to latest sale_date=2026-07-27 for shop=shop_001
+2026-07-28 19:07:55 | INFO     | shopmind | Analytics dashboard shop=shop_001 as_of=2026-07-27 revenue=62884.00 growth=98.30%
+2026-07-28 19:07:55 | INFO     | shopmind | Analytics as_of fallback to latest sale_date=2026-07-27 for shop=shop_001
+2026-07-28 19:07:56 | INFO     | shopmind | Analytics as_of fallback to latest sale_date=2026-07-27 for shop=shop_001
+2026-07-28 19:07:56 | INFO     | shopmind | Analytics as_of fallback to latest sale_date=2026-07-27 for shop=shop_001
+2026-07-28 19:07:56 | INFO     | shopmind | Business health shop=shop_001 score=87.1 growth=100.0 consistency=57.6 movement=99.5
+2026-07-28 19:07:56 | INFO     | shopmind | Prepared analytics insights for shop=shop_001 (no Gemini call)
+2026-07-28 19:08:03 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Price anomaly: Gel Ball Pen Blue 27% above market
+2026-07-28 19:08:11 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.CRITICAL: Reorder Ponni Rice 5kg immediately
+2026-07-28 19:08:27 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Free ₹5,850 locked in Medium Heavy Stapler
+2026-07-28 19:08:35 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Price anomaly: Classmate Notebook 120p 24% below market
+2026-07-28 19:08:43 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Free ₹14,400 locked in Plastic Water Bottle 1L
+2026-07-28 19:08:51 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.HIGH: Demand spike on Gel Ball Pen Blue — pre-empt stockout
+2026-07-28 19:08:59 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Price anomaly: Ponni Rice 5kg 11% below market
+2026-07-28 19:09:15 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.LOW: Order logged: Redmi Note 13 (8GB RAM)
+2026-07-28 19:09:31 | INFO     | shopmind | AlertEngine: [EventSeverity.WARNING] Demand Spike: Medium Heavy Stapler for shop_001
+2026-07-28 19:09:31 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.HIGH: Demand spike on Medium Heavy Stapler — pre-empt stockout
+2026-07-28 19:09:39 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Price anomaly: School Backpack Blue 29% below market
+2026-07-28 19:10:03 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Free ₹2,500 locked in Gel Ball Pen Blue
+2026-07-28 19:10:27 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.MEDIUM: Forecast update: Plastic Water Bottle 1L demand rising
+2026-07-28 19:10:36 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.LOW: Order logged: Redmi Note 13 (8GB RAM)
+2026-07-28 19:11:00 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.MEDIUM: Forecast update: Aavin Milk 500ml demand rising
+2026-07-28 19:11:16 | INFO     | shopmind | AlertEngine: [EventSeverity.SUCCESS] Revenue Milestone Reached for shop_001
+2026-07-28 19:11:24 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Price anomaly: Gel Ball Pen Blue 16% above market
+2026-07-28 19:11:40 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.MEDIUM: Forecast update: Medium Heavy Stapler demand rising
