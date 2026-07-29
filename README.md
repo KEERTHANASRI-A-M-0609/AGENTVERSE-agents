@@ -1,9 +1,8 @@
-<<<<<<< HEAD
 # ShopMind AI — Demand Prediction Agent
 
 Retail demand forecasting for small shops: ML forecasts, reorder recommendations, and optional Gemini explanations — without burning API quota on every dashboard refresh.
 
-## Quick start
+## Quick Start
 
 ### 1. Backend
 
@@ -15,15 +14,20 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Load sample sales data, then start the API:
+> ⚠️ `.env` is **not included in the repo** (gitignored for security).  
+> `copy .env.example .env` creates it — the default key `shopmind_dev_api_key_2025` works out of the box.
+
+Load sample data, then start the API:
 
 ```powershell
 python -m app.db.load_dataset
 python run.py
 ```
 
-- API: http://localhost:8000  
-- Swagger: http://localhost:8000/docs  
+> ⚠️ `shopmind.db` is **not in the repo** — you must run `python -m app.db.load_dataset` first to create it.
+
+- API: http://localhost:8000
+- Swagger: http://localhost:8000/docs
 - Auth header: `X-API-Key: shopmind_dev_api_key_2025`
 
 ### 2. Frontend
@@ -34,7 +38,7 @@ npm install
 npm run dev
 ```
 
-- UI: http://localhost:5173  
+- UI: http://localhost:5173
 - Vite proxies `/api` → `http://127.0.0.1:8000`
 
 ### 3. Tests
@@ -43,6 +47,15 @@ npm run dev
 cd backend
 pytest
 ```
+
+## Why am I getting 401 Unauthorized?
+
+Two common causes:
+
+1. **You skipped `copy .env.example .env`** — the backend has no API key configured, so it rejects all requests.
+2. **You skipped `python -m app.db.load_dataset`** — the database doesn't exist yet.
+
+Run both commands above and restart the backend.
 
 ## Gemini (optional, quota-safe)
 
@@ -60,16 +73,14 @@ Auto-refresh runs every **5 minutes** and never calls Gemini.
 
 | Method | Path | Notes |
 |--------|------|--------|
-| POST | `/api/v1/demand/predict` | Single product forecast (`include_ai` defaults false) |
-| POST | `/api/v1/demand/predict/bulk` | All products (local explanations) |
+| POST | `/api/v1/demand/predict` | Single product forecast |
+| POST | `/api/v1/demand/predict/bulk` | All products |
 | GET | `/api/v1/demand/dashboard/{shop_id}` | KPIs, alerts, accuracy, top reorders |
 | GET | `/api/v1/demand/trends/{shop_id}` | Trend summary |
 | POST | `/api/v1/demand/explain` | Opt-in AI explanation |
 | POST | `/api/v1/demand/recommendations/action` | Accept / modify reorder |
 | GET | `/api/v1/demand/history/{shop_id}` | Past predictions |
-| GET | `/api/v1/health` | DB, model store, Gemini flag, last prediction |
+| GET | `/api/v1/health` | DB, model store, Gemini flag |
+| GET | `/api/v1/events/stream/{shop_id}` | Live SSE event stream |
 
-Demo shop ID after dataset load: `shop_001`.
-=======
-# AGENTVERSE-agents
->>>>>>> 28962d34bc33b86a63dd6cc021b453c29189d187
+Demo shop ID after dataset load: `shop_001`
