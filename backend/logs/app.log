@@ -16360,3 +16360,6 @@ sqlalchemy.exc.TimeoutError: QueuePool limit of size 5 overflow 10 reached, conn
 2026-07-29 14:52:00 | INFO     | shopmind | AlertEngine: [EventSeverity.CRITICAL] Critical Stock: Aavin Milk 500ml for shop_001
 2026-07-29 14:52:00 | INFO     | shopmind | [AgentRole.DEMAND] DecisionPriority.CRITICAL: Reorder Aavin Milk 500ml immediately
 2026-07-29 14:52:08 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Price anomaly: Redmi Note 13 (8GB RAM) 19% below market
+2026-07-29 14:52:40 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Cart abandonment signal on Gel Ball Pen Blue
+2026-07-29 14:53:04 | INFO     | shopmind | [AgentRole.INTELLIGENCE] DecisionPriority.MEDIUM: Price anomaly: School Backpack Blue 21% above market
+2026-07-29 14:53:12 | INFO     | shopmind | AlertEngine: [EventSeverity.CRITICAL] Critical Stock: School Backpack Blue for shop_001
