@@ -99,11 +99,12 @@ async def get_revenue_trends(
 async def get_business_health(
     shop_id: str = Query("shop_001", min_length=1),
     as_of: Optional[date] = Query(None),
+    lookback_days: int = Query(30, ge=1, le=365),
     db: Session = Depends(get_db),
     _: str = Depends(verify_api_key),
 ):
     try:
-        return await AnalyticsService(db).get_health(shop_id, as_of=as_of)
+        return await AnalyticsService(db).get_health(shop_id, as_of=as_of, lookback_days=lookback_days)
     except ShopMindException as e:
         raise to_http_exception(e)
 
@@ -123,7 +124,9 @@ async def prepare_insights(
     _: str = Depends(verify_api_key),
 ):
     try:
-        logger.info("POST /analytics/insights shop_id=%s", req.shop_id)
-        return await AnalyticsService(db).prepare_insights(req.shop_id, as_of=req.as_of)
+        logger.info("POST /analytics/insights shop_id=%s lookback_days=%s", req.shop_id, req.lookback_days)
+        return await AnalyticsService(db).prepare_insights(
+            req.shop_id, as_of=req.as_of, lookback_days=req.lookback_days
+        )
     except ShopMindException as e:
         raise to_http_exception(e)

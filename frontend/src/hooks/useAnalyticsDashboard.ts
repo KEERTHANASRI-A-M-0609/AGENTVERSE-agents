@@ -16,7 +16,7 @@ export interface AnalyticsBundle {
   insights: AnalyticsInsightsResponse
 }
 
-export function useAnalyticsDashboard(shopId: string, days = 7, refreshIntervalMs = 300000) {
+export function useAnalyticsDashboard(shopId: string, days = 30, refreshIntervalMs = 300000) {
   const [data, setData] = useState<AnalyticsBundle | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,18 +26,37 @@ export function useAnalyticsDashboard(shopId: string, days = 7, refreshIntervalM
     setLoading(true)
     setError(null)
     try {
-      const [dashboard, products, trends, health, insights] = await Promise.all([
+      // Fast calls — render immediately
+      const [dashboard, products, trends, health] = await Promise.all([
         analyticsApi.getDashboard(shopId),
         analyticsApi.getProducts(shopId, days),
         analyticsApi.getTrends(shopId, days),
-        analyticsApi.getHealth(shopId),
-        analyticsApi.getInsights(shopId),
+        analyticsApi.getHealth(shopId, days),
       ])
-      setData({ dashboard, products, trends, health, insights })
-      setLastUpdated(dashboard.generated_at)
+
+      // Stub insights so page renders without waiting for the slow call
+      const insightsStub: AnalyticsInsightsResponse = {
+        shop_id: shopId,
+        as_of: dashboard.as_of,
+        generated_at: dashboard.generated_at,
+        summary: '',
+        highlights: [],
+        recommendations: [],
+        health_score: health.health_score,
+      }
+
+      setData({ dashboard, products, trends, health, insights: insightsStub })
+      setLastUpdated(String(dashboard.generated_at))
+      setLoading(false)
+
+      // Fetch insights in background — update when ready
+      analyticsApi.getInsights(shopId, days).then(insights => {
+        setData(prev => prev ? { ...prev, insights } : prev)
+      }).catch(() => {
+        // insights failure is non-fatal — stub already shown
+      })
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load analytics')
-    } finally {
       setLoading(false)
     }
   }, [shopId, days])

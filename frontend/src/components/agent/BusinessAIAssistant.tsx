@@ -25,19 +25,20 @@ interface Props {
   analytics?: AnalyticsBundle | null
   demand?: DashboardResponse | null
   horizon?: number
+  inline?: boolean
 }
 
 // ── Intent detection ──────────────────────────────────────────────────────────
 function detectIntent(q: string): string {
   const t = q.toLowerCase()
-  if (/reorder|order today|what (to|should i) (buy|order|restock)|replenish|purchase/.test(t)) return 'reorder'
-  if (/stockout|out of stock|run out|empty|zero stock/.test(t)) return 'stockout'
+  // Stockout / running out — must be first, very common demand question
+  if (/run.*out|running out|out.*first|finish.*first|which.*first|stockout|out of stock|empty|zero stock|going to (run|finish)|lose.*money|losing.*sale/.test(t)) return 'stockout'
+  if (/reorder|order today|what (to|should i) (buy|order|restock)|replenish|purchase|need to order|should.*order/.test(t)) return 'reorder'
   if (/critical|urgent|emergency|immediate/.test(t)) return 'critical'
-  if (/slow mov|not selling|dead stock|idle|stagnant|capital lock/.test(t)) return 'slow_movers'
-  if (/best sell|top product|top sell|highest revenue|most sold|fast mov/.test(t)) return 'best_sellers'
-  // product-level demand trend — must come before generic 'growth'
-  if (/which product|what product|product.*demand|demand.*increas|demand.*rising|demand.*growing|demand.*up|increas.*demand|rising.*demand|trending|spike|high demand|demand.*recent|recent.*demand/.test(t)) return 'trending'
-  if (/revenue|sales today|how much.*earn|income|turnover/.test(t)) return 'revenue'
+  if (/slow mov|not selling|dead stock|idle|stagnant|capital lock|moving slow/.test(t)) return 'slow_movers'
+  if (/best sell|top product|top sell|highest|most sold|fast mov|selling (well|fast|most)/.test(t)) return 'best_sellers'
+  if (/which product|what product|product.*demand|demand.*increas|demand.*rising|demand.*growing|demand.*up|increas.*demand|rising.*demand|trending|spike|high demand/.test(t)) return 'trending'
+  if (/revenue|sales today|how much.*earn|income|turnover|how much.*make|made today/.test(t)) return 'revenue'
   if (/growth|trend|up|down|increas|decreas|compar|yesterday|vs/.test(t)) return 'growth'
   if (/health|score|overall|status|how.*doing|performance/.test(t)) return 'health'
   if (/forecast|predict|next.*day|upcoming|future demand/.test(t)) return 'forecast'
@@ -66,49 +67,116 @@ function parseHorizonFromText(q: string): number | null {
 // ── Demand reply builder ──────────────────────────────────────────────────────
 function buildDemandReply(intent: string, data: DashboardResponse, horizon: number): ReplyBlock[] {
   const portfolio = data.portfolio?.length ? data.portfolio : data.top_reorder_products
-  const high = portfolio.filter(p => p.urgency === 'high')
+  const high   = portfolio.filter(p => p.urgency === 'high')
   const medium = portfolio.filter(p => p.urgency === 'medium')
-  const critical = portfolio.filter(p => p.urgency === 'high' && (p.days_until_stockout ?? 99) <= 3)
-  const conf = Math.round(data.kpis.avg_confidence_score * 100)
+  const low    = portfolio.filter(p => p.urgency === 'low')
+  // Sort by days_until_stockout ascending — soonest first
+  const byStockout = [...portfolio]
+    .filter(p => p.days_until_stockout != null)
+    .sort((a, b) => (a.days_until_stockout ?? 99) - (b.days_until_stockout ?? 99))
+  const critical = byStockout.filter(p => (p.days_until_stockout ?? 99) <= 3)
+  const conf   = Math.round(data.kpis.avg_confidence_score * 100)
   const health = Math.round(data.kpis.inventory_health_score)
+
+  const daysLabel = (d: number | null) =>
+    d == null ? 'unknown' : d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`
 
   switch (intent) {
     case 'reorder':
       if (!high.length && !medium.length)
-        return [{ type: 'text', text: 'All products are adequately stocked. No reorders needed right now.' }, { type: 'stat', label: 'Inventory Health', value: `${health}/100`, tone: 'good' }]
+        return [
+          { type: 'text', text: `Great news — all ${portfolio.length} products are adequately stocked. No reorders needed right now.` },
+          { type: 'stat', label: 'Inventory Health', value: `${health}/100`, tone: 'good' },
+        ]
       return [
-        { type: 'text', text: `You need to order ${high.length + medium.length} product${high.length + medium.length !== 1 ? 's' : ''} in the next ${horizon} days:` },
-        { type: 'list', items: [...high, ...medium].slice(0, 5).map(p => `${p.product_name} — order ~${Math.round(p.total_predicted_units * 1.2)} units (runs out in ${p.days_until_stockout ?? '?'} day${(p.days_until_stockout ?? 2) !== 1 ? 's' : ''})`), tone: 'bad' },
-        ...high.slice(0, 2).map(p => ({ type: 'action' as const, label: `Order ${p.product_name} today`, detail: `${Math.round(p.total_predicted_units * 1.2)} units · only ${p.days_until_stockout ?? '?'} day${(p.days_until_stockout ?? 2) !== 1 ? 's' : ''} of stock left`, priority: 'high' as const })),
+        { type: 'text', text: `You need to reorder ${high.length + medium.length} product${high.length + medium.length !== 1 ? 's' : ''} in the next ${horizon} days:` },
+        { type: 'list', items: [...high, ...medium].slice(0, 6).map(p =>
+          `${p.product_name} — order ~${Math.round(p.total_predicted_units * 1.2)} units · runs out ${daysLabel(p.days_until_stockout ?? null)}`
+        ), tone: 'bad' },
+        ...high.slice(0, 2).map(p => ({
+          type: 'action' as const,
+          label: `Order ${p.product_name} today`,
+          detail: `~${Math.round(p.total_predicted_units * 1.2)} units needed · runs out ${daysLabel(p.days_until_stockout ?? null)}`,
+          priority: 'high' as const,
+        })),
       ]
 
     case 'stockout':
-    case 'critical':
-      if (!critical.length && !high.length)
-        return [{ type: 'text', text: 'No stockout risk detected right now.' }, { type: 'stat', label: 'Health', value: `${health}/100`, tone: 'good' }]
+    case 'critical': {
+      const atRisk = byStockout.filter(p => (p.days_until_stockout ?? 99) <= 7)
+      if (!atRisk.length)
+        return [
+          { type: 'text', text: `No stockout risk in the next 7 days. All ${portfolio.length} products have sufficient stock.` },
+          { type: 'stat', label: 'Inventory Health', value: `${health}/100`, tone: 'good' },
+        ]
+      const first = atRisk[0]
       return [
-        { type: 'text', text: `${critical.length} product${critical.length !== 1 ? 's' : ''} will run out very soon:` },
-        { type: 'list', items: critical.slice(0, 4).map(p => `${p.product_name} — only ${p.days_until_stockout ?? '<1'} day${(p.days_until_stockout ?? 0) !== 1 ? 's' : ''} of stock left`), tone: 'bad' },
-        ...critical.slice(0, 2).map(p => ({ type: 'action' as const, label: `Order ${p.product_name} now`, detail: `Call your supplier today — you'll lose sales if you wait`, priority: 'high' as const })),
+        { type: 'text', text: `${first.product_name} will run out first — ${daysLabel(first.days_until_stockout ?? null)}. Here's the full risk list:` },
+        { type: 'list', items: atRisk.slice(0, 6).map((p, i) =>
+          `${i + 1}. ${p.product_name} — runs out ${daysLabel(p.days_until_stockout ?? null)} · urgency: ${p.urgency}`
+        ), tone: 'bad' },
+        ...atRisk.slice(0, 2).map(p => ({
+          type: 'action' as const,
+          label: `Order ${p.product_name} now`,
+          detail: `Runs out ${daysLabel(p.days_until_stockout ?? null)} — call your supplier today`,
+          priority: (p.days_until_stockout ?? 99) <= 3 ? 'high' as const : 'medium' as const,
+        })),
       ]
+    }
 
     case 'trending': {
-      const rising = portfolio.filter(p => p.trend_type === 'upward' || p.trend_type === 'seasonal_spike')
+      const rising  = portfolio.filter(p => p.trend_type === 'upward' || p.trend_type === 'seasonal_spike')
         .sort((a, b) => b.total_predicted_units - a.total_predicted_units)
-      const stable = portfolio.filter(p => p.trend_type === 'stable')
       const falling = portfolio.filter(p => p.trend_type === 'downward')
+      const stable  = portfolio.filter(p => p.trend_type === 'stable')
       if (!rising.length)
         return [
-          { type: 'text', text: 'No products with rising demand detected in the current forecast window.' },
-          { type: 'stat', label: 'Stable SKUs', value: stable.length.toString(), tone: 'neutral' },
+          { type: 'text', text: `No products with rising demand right now. ${stable.length} products are stable.` },
+          { type: 'stat', label: 'Stable products', value: stable.length.toString(), tone: 'neutral' },
         ]
       return [
-        { type: 'stat', label: 'Rising demand SKUs', value: rising.length.toString(), tone: 'warn' },
+        { type: 'text', text: `${rising.length} product${rising.length !== 1 ? 's are' : ' is'} seeing rising demand:` },
         { type: 'list', items: rising.slice(0, 5).map(p =>
           `${p.product_name} — ${Math.round(p.total_predicted_units)} units forecast · ${p.trend_type === 'seasonal_spike' ? '🔥 Seasonal spike' : '↑ Upward trend'}`
         ), tone: 'warn' },
-        ...rising.slice(0, 2).map(p => ({ type: 'action' as const, label: `Stock up ${p.product_name}`, detail: `Forecast: ${Math.round(p.total_predicted_units)} units · ensure supply before demand peaks`, priority: 'medium' as const })),
-        ...(falling.length ? [{ type: 'stat' as const, label: 'Declining SKUs', value: falling.length.toString(), tone: 'bad' as const }] : []),
+        ...rising.slice(0, 2).map(p => ({
+          type: 'action' as const,
+          label: `Stock up ${p.product_name}`,
+          detail: `Forecast: ${Math.round(p.total_predicted_units)} units · ensure supply before demand peaks`,
+          priority: 'medium' as const,
+        })),
+        ...(falling.length ? [{ type: 'stat' as const, label: 'Declining products', value: `${falling.map(p => p.product_name).slice(0, 2).join(', ')}${falling.length > 2 ? ` +${falling.length - 2} more` : ''}`, tone: 'bad' as const }] : []),
+      ]
+    }
+
+    case 'best_sellers': {
+      const top = [...portfolio].sort((a, b) => b.total_predicted_units - a.total_predicted_units)
+      return [
+        { type: 'text', text: `Top selling products by forecast demand (next ${horizon} days):` },
+        { type: 'list', items: top.slice(0, 5).map((p, i) =>
+          `${i + 1}. ${p.product_name} — ${Math.round(p.total_predicted_units)} units · ${p.trend_type === 'upward' ? '↑ rising' : p.trend_type === 'seasonal_spike' ? '🔥 spike' : '→ stable'}`
+        ), tone: 'good' },
+        { type: 'action', label: `Keep ${top[0].product_name} well stocked`, detail: 'Highest demand product — avoid stockout at all costs', priority: 'high' },
+      ]
+    }
+
+    case 'slow_movers': {
+      const slow = [...portfolio]
+        .filter(p => p.trend_type === 'downward' || p.urgency === 'low')
+        .sort((a, b) => a.total_predicted_units - b.total_predicted_units)
+      if (!slow.length)
+        return [{ type: 'text', text: 'No slow-moving products detected. All products have reasonable demand.' }]
+      return [
+        { type: 'text', text: `${slow.length} product${slow.length !== 1 ? 's are' : ' is'} moving slowly:` },
+        { type: 'list', items: slow.slice(0, 5).map(p =>
+          `${p.product_name} — only ${Math.round(p.total_predicted_units)} units forecast · ${p.trend_type === 'downward' ? '↓ declining' : 'low demand'}`
+        ), tone: 'warn' },
+        ...slow.slice(0, 1).map(p => ({
+          type: 'action' as const,
+          label: `Reduce orders for ${p.product_name}`,
+          detail: 'Demand is low — avoid overstocking to free up capital',
+          priority: 'low' as const,
+        })),
       ]
     }
 
@@ -117,42 +185,61 @@ function buildDemandReply(intent: string, data: DashboardResponse, horizon: numb
         { type: 'stat', label: `Total demand (${horizon}d)`, value: `${Math.round(data.kpis.total_predicted_demand_7d)} units`, tone: 'neutral' },
         { type: 'stat', label: 'Model confidence', value: `${conf}%`, tone: conf >= 75 ? 'good' : conf >= 55 ? 'warn' : 'bad' },
         { type: 'text', text: data.executive_brief },
-        { type: 'list', items: portfolio.filter(p => p.trend_type === 'upward' || p.trend_type === 'seasonal_spike').slice(0, 3).map(p => `${p.product_name}: rising demand (+${Math.round(p.total_predicted_units * 0.2)} units above baseline)`), tone: 'warn' },
+        ...(byStockout.length ? [{ type: 'text' as const, text: `Next to run out: ${byStockout[0].product_name} (${daysLabel(byStockout[0].days_until_stockout ?? null)})` }] : []),
+        { type: 'list', items: portfolio.filter(p => p.trend_type === 'upward' || p.trend_type === 'seasonal_spike').slice(0, 3).map(p =>
+          `${p.product_name}: rising demand — ${Math.round(p.total_predicted_units)} units forecast`
+        ), tone: 'warn' },
       ]
 
     case 'risk':
       return [
-        { type: 'stat', label: 'Critical SKUs', value: critical.length.toString(), tone: critical.length > 0 ? 'bad' : 'good' },
-        { type: 'stat', label: 'High urgency', value: high.length.toString(), tone: high.length > 0 ? 'warn' : 'good' },
-        { type: 'stat', label: 'Medium urgency', value: medium.length.toString(), tone: 'neutral' },
-        { type: 'list', items: [...critical, ...high].slice(0, 4).map(p => `${p.product_name}: ${p.days_until_stockout ?? '?'} days to stockout`), tone: 'bad' },
+        { type: 'text', text: critical.length > 0
+          ? `${critical.length} product${critical.length !== 1 ? 's are' : ' is'} critically low — act today:`
+          : high.length > 0 ? `${high.length} product${high.length !== 1 ? 's need' : ' needs'} ordering this week:` : 'No critical risk right now.' },
+        { type: 'list', items: [...critical, ...high].slice(0, 5).map(p =>
+          `${p.product_name} — runs out ${daysLabel(p.days_until_stockout ?? null)}`
+        ), tone: 'bad' },
+        { type: 'stat', label: 'High urgency', value: high.length.toString(), tone: high.length > 0 ? 'bad' : 'good' },
+        { type: 'stat', label: 'Medium urgency', value: medium.length.toString(), tone: medium.length > 0 ? 'warn' : 'good' },
+        { type: 'stat', label: 'Well stocked', value: low.length.toString(), tone: 'good' },
       ]
 
     case 'confidence':
       return [
         { type: 'stat', label: 'Forecast confidence', value: `${conf}%`, tone: conf >= 75 ? 'good' : conf >= 55 ? 'warn' : 'bad' },
-        { type: 'text', text: conf >= 75 ? 'Model is well-calibrated. Forecasts are reliable for ordering decisions.' : conf >= 55 ? 'Moderate confidence. Use forecasts as guidance but add a 15% safety buffer.' : 'Low confidence. Limited sales history. Add a 25% safety buffer to all orders.' },
+        { type: 'text', text: conf >= 75
+          ? 'Model is well-calibrated. Forecasts are reliable for ordering decisions.'
+          : conf >= 55 ? 'Moderate confidence. Use forecasts as guidance but add a 15% safety buffer.'
+          : 'Low confidence. Limited sales history. Add a 25% safety buffer to all orders.' },
         { type: 'stat', label: 'Reorder coverage', value: `${data.kpis.reorder_coverage_pct}%`, tone: data.kpis.reorder_coverage_pct >= 80 ? 'good' : 'warn' },
       ]
 
-    case 'recommend':
+    case 'recommend': {
       const actions: ReplyBlock[] = [{ type: 'text', text: "Here's what to do right now:" }]
-      if (critical.length) actions.push({ type: 'action', label: `Order ${critical[0].product_name} today`, detail: 'Runs out in ≤3 days — call your supplier now', priority: 'high' })
-      if (high.length) actions.push({ type: 'action', label: `Order ${high.length} product${high.length !== 1 ? 's' : ''} this week`, detail: high.slice(0, 2).map(p => p.product_name).join(', '), priority: 'high' })
-      if (medium.length) actions.push({ type: 'action', label: `Plan orders for ${medium.length} product${medium.length !== 1 ? 's' : ''} soon`, detail: 'Within the next 5–7 days', priority: 'medium' })
-      const slow = portfolio.filter(p => p.urgency === 'low' && p.trend_type === 'downward')
-      if (slow.length) actions.push({ type: 'action', label: `Order less ${slow[0].product_name} next time`, detail: 'Not selling well — avoid buying too much', priority: 'low' })
+      if (critical.length) actions.push({ type: 'action', label: `Order ${critical[0].product_name} today`, detail: `Runs out ${daysLabel(critical[0].days_until_stockout ?? null)} — call your supplier now`, priority: 'high' })
+      if (high.length > (critical.length ? 1 : 0)) {
+        const rest = high.filter(p => !critical.find(c => c.product_id === p.product_id))
+        if (rest.length) actions.push({ type: 'action', label: `Order ${rest.map(p => p.product_name).slice(0, 2).join(' & ')} this week`, detail: rest.slice(0, 3).map(p => `${p.product_name} (${daysLabel(p.days_until_stockout ?? null)})`).join(', '), priority: 'high' })
+      }
+      if (medium.length) actions.push({ type: 'action', label: `Plan orders for ${medium.slice(0, 2).map(p => p.product_name).join(' & ')}`, detail: 'Within the next 5–7 days', priority: 'medium' })
+      const slowDown = portfolio.filter(p => p.urgency === 'low' && p.trend_type === 'downward')
+      if (slowDown.length) actions.push({ type: 'action', label: `Reduce orders for ${slowDown[0].product_name}`, detail: 'Demand is declining — avoid overstocking', priority: 'low' })
       return actions
+    }
 
     case 'summary':
     case 'general':
-    default:
+    default: {
+      const firstOut = byStockout[0]
       return [
         { type: 'stat', label: 'Inventory health', value: `${health}/100`, tone: health >= 70 ? 'good' : health >= 50 ? 'warn' : 'bad' },
         { type: 'stat', label: 'Forecast confidence', value: `${conf}%`, tone: conf >= 70 ? 'good' : 'warn' },
         { type: 'stat', label: `Demand (${horizon}d)`, value: `${Math.round(data.kpis.total_predicted_demand_7d)} units`, tone: 'neutral' },
         { type: 'text', text: data.executive_brief },
+        ...(firstOut ? [{ type: 'text' as const, text: `⚠ Next to run out: ${firstOut.product_name} — ${daysLabel(firstOut.days_until_stockout ?? null)}` }] : []),
+        ...(high.length ? [{ type: 'action' as const, label: `Order ${high[0].product_name} today`, detail: `Runs out ${daysLabel(high[0].days_until_stockout ?? null)}`, priority: 'high' as const }] : []),
       ]
+    }
   }
 }
 
@@ -312,10 +399,10 @@ function Block({ b }: { b: ReplyBlock }) {
 
 const SUGGESTIONS = {
   demand: [
+    'What is running out first?',
     'What do I need to order today?',
-    'What will run out first?',
     'Which products are selling fast?',
-    'Am I going to lose money today?',
+    'What should I do right now?',
   ],
   analytics: [
     'How much did I make today?',
@@ -325,7 +412,7 @@ const SUGGESTIONS = {
   ],
 }
 
-export function BusinessAIAssistant({ mode, shopId, analytics, demand, horizon = 7 }: Props) {
+export function BusinessAIAssistant({ mode, shopId, analytics, demand, horizon = 7, inline: _inline }: Props) {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'init',
     role: 'assistant',
@@ -349,21 +436,21 @@ export function BusinessAIAssistant({ mode, shopId, analytics, demand, horizon =
         const requestedHorizon = parseHorizonFromText(trimmed) ?? horizon
         let blocks: ReplyBlock[]
         if (mode === 'analytics') {
-          const insights = await analyticsApi.getInsights(shopId)
           if (analytics) {
-            // reuse provided analytics bundle but refresh trends for requested horizon
-            const trends = await analyticsApi.getTrends(shopId, requestedHorizon)
-            const bundle: AnalyticsBundle = { ...analytics, trends, insights }
+            // Reuse existing bundle — avoid redundant API calls on every message
+            const bundle: AnalyticsBundle = requestedHorizon !== horizon
+              ? { ...analytics, trends: await analyticsApi.getTrends(shopId, requestedHorizon) }
+              : analytics
             blocks = buildAnalyticsReply(intent, bundle, requestedHorizon)
           } else {
-            const bundle: AnalyticsBundle = {
-              dashboard: await analyticsApi.getDashboard(shopId),
-              products: await analyticsApi.getProducts(shopId),
-              trends: await analyticsApi.getTrends(shopId, requestedHorizon),
-              health: await analyticsApi.getHealth(shopId),
-              insights,
-            }
-            blocks = buildAnalyticsReply(intent, bundle, requestedHorizon)
+            const [dashboard, products, trends, health, insights] = await Promise.all([
+              analyticsApi.getDashboard(shopId),
+              analyticsApi.getProducts(shopId, requestedHorizon),
+              analyticsApi.getTrends(shopId, requestedHorizon),
+              analyticsApi.getHealth(shopId, requestedHorizon),
+              analyticsApi.getInsights(shopId, requestedHorizon),
+            ])
+            blocks = buildAnalyticsReply(intent, { dashboard, products, trends, health, insights }, requestedHorizon)
           }
         } else {
           const dash = demand ?? await demandApi.getDashboard(shopId, requestedHorizon)

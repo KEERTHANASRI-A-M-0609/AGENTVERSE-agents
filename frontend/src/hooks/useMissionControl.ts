@@ -10,7 +10,7 @@ export interface MissionControlData {
   analytics: AnalyticsBundle
 }
 
-export function useMissionControl(shopId = SHOP_ID, horizon = 7) {
+export function useMissionControl(shopId = SHOP_ID, horizon = 30) {
   const [data, setData] = useState<MissionControlData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -20,21 +20,35 @@ export function useMissionControl(shopId = SHOP_ID, horizon = 7) {
     setLoading(true)
     setError(null)
     try {
-      const [demand, dashboard, products, trends, health, insights] = await Promise.all([
+      // Fast calls first — dashboard, products, trends (no insights/health which are slow)
+      const [demand, dashboard, products, trends] = await Promise.all([
         demandApi.getDashboard(shopId, horizon),
         analyticsApi.getDashboard(shopId),
-        analyticsApi.getProducts(shopId),
-        analyticsApi.getTrends(shopId, 7),
-        analyticsApi.getHealth(shopId),
-        analyticsApi.getInsights(shopId),
+        analyticsApi.getProducts(shopId, 30),
+        analyticsApi.getTrends(shopId, 30),
       ])
+
+      // Health is a single fast call — fetch after the parallel batch
+      const health = await analyticsApi.getHealth(shopId, 30)
+
+      // Build a minimal insights stub so AnalyticsBundle type is satisfied
+      const insights = {
+        shop_id: shopId,
+        as_of: dashboard.as_of,
+        generated_at: dashboard.generated_at,
+        summary: '',
+        highlights: [],
+        recommendations: [],
+        health_score: health.health_score,
+      }
+
       setData({
         demand,
         analytics: { dashboard, products, trends, health, insights },
       })
       setLastUpdated(new Date().toISOString())
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load Mission Control')
+      setError(e instanceof Error ? e.message : 'Failed to load dashboard')
     } finally {
       setLoading(false)
     }

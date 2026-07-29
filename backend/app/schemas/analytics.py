@@ -13,6 +13,7 @@ class InsightsRequest(BaseModel):
         default=None,
         description="Reference business date. Defaults to latest available sale date.",
     )
+    lookback_days: int = Field(default=30, ge=1, le=365, description="Period window in days")
 
 
 # ── Shared / nested ──────────────────────────────────────────────────────────

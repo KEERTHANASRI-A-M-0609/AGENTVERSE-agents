@@ -6,9 +6,10 @@ Quota policy: dashboard/bulk/default predict use local template explanations onl
 Gemini is only used via explain() or predict(include_ai=True) when GEMINI_ENABLED.
 """
 import json
+import time
 import uuid
 from datetime import date, datetime, timedelta
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -51,6 +52,10 @@ from app.services.reorder_service import (
 
 
 class DemandService:
+    # In-process cache: (shop_id, horizon) -> (BulkPredictResponse, timestamp)
+    _bulk_cache: Dict[Tuple[str, int], Tuple["BulkPredictResponse", float]] = {}
+    _CACHE_TTL = 120  # seconds
+
     def __init__(self, db: Session):
         self.db = db
         self.product_repo = ProductRepository(db)
@@ -192,6 +197,13 @@ class DemandService:
         )
 
     async def bulk_predict(self, req: BulkPredictRequest) -> BulkPredictResponse:
+        # Return cached result if fresh and not filtering specific products
+        cache_key = (req.shop_id, req.forecast_horizon_days)
+        if not req.product_ids:
+            cached = DemandService._bulk_cache.get(cache_key)
+            if cached and (time.time() - cached[1]) < DemandService._CACHE_TTL:
+                return cached[0]
+
         products = self.product_repo.get_by_shop(req.shop_id)
         if req.product_ids:
             products = [p for p in products if p.id in req.product_ids]
@@ -234,13 +246,18 @@ class DemandService:
             low_urgency_count=sum(1 for f in forecasts if f.urgency == "low"),
         )
 
-        return BulkPredictResponse(
+        result = BulkPredictResponse(
             shop_id=req.shop_id,
             generated_at=datetime.utcnow(),
             total_products=len(forecasts),
             forecasts=forecasts,
             summary=summary,
         )
+
+        if not req.product_ids:
+            DemandService._bulk_cache[cache_key] = (result, time.time())
+
+        return result
 
     async def get_dashboard(self, shop_id: str, horizon_days: int = 7) -> DashboardResponse:
         horizon_days = max(1, min(90, horizon_days))

@@ -29,17 +29,18 @@ export const analyticsApi = {
       })
       .then((r) => r.data),
 
-  getHealth: (shopId: string) =>
+  getHealth: (shopId: string, lookbackDays = 30) =>
     apiClient
       .get<BusinessHealthResponse>('/analytics/health', {
-        params: { shop_id: shopId },
+        params: { shop_id: shopId, lookback_days: lookbackDays },
       })
       .then((r) => r.data),
 
-  getInsights: (shopId: string) =>
+  getInsights: (shopId: string, lookbackDays = 30) =>
     apiClient
       .post<AnalyticsInsightsResponse>('/analytics/insights', {
         shop_id: shopId,
-      })
+        lookback_days: lookbackDays,
+      }, { timeout: 120000 })
       .then((r) => r.data),
 }

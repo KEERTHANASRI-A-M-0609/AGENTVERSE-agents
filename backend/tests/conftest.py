@@ -8,9 +8,15 @@ from app.main import app
 from app.api.deps import get_db
 from app.core.config import settings
 
+from sqlalchemy.pool import NullPool
+
 TEST_DB_URL = "sqlite:///./test_shopmind.db"
 
-engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    TEST_DB_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=NullPool,
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
